@@ -11,6 +11,12 @@
 
 namespace Consensus {
 
+enum Pow
+{
+    POW_SHA256,
+    POW_PACKETCRYPT
+};
+
 enum DeploymentPos
 {
     DEPLOYMENT_TESTDUMMY,
@@ -80,6 +86,7 @@ struct Params {
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
     uint256 nMinimumChainWork;
     uint256 defaultAssumeValid;
+    enum Pow pow;
 };
 } // namespace Consensus
 

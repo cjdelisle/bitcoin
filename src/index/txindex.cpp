@@ -249,7 +249,10 @@ bool TxIndex::WriteBlock(const CBlock& block, const CBlockIndex* pindex)
     // Exclude genesis block transaction because outputs are not spendable.
     if (pindex->nHeight == 0) return true;
 
-    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
+    unsigned int offset = GetSizeOfCompactSize(block.vtx.size());
+    offset += GetSerializeSize(block.pcp);
+
+    CDiskTxPos pos(pindex->GetBlockPos(), offset);
     std::vector<std::pair<uint256, CDiskTxPos>> vPos;
     vPos.reserve(block.vtx.size());
     for (const auto& tx : block.vtx) {

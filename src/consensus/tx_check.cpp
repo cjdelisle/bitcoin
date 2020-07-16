@@ -44,8 +44,13 @@ bool CheckTransaction(const CTransaction& tx, TxValidationState& state)
 
     if (tx.IsCoinBase())
     {
-        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > 100)
+        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > 100) {
+            if (tx.GetHash() == uint256S("fb91c86ad3d3ec947730ef55c5ab0665ab9d449d912a22ec7e46133ba25b34df")) {
+                // PKT blockchain genesis
+                return true;
+            }
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-cb-length");
+        }
     }
     else
     {

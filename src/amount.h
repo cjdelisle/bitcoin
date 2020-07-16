@@ -11,7 +11,8 @@
 /** Amount in satoshis (Can be negative) */
 typedef int64_t CAmount;
 
-static const CAmount COIN = 100000000;
+static const CAmount COIN_BTC = 100000000;
+static const CAmount COIN = 0x40000000;
 
 /** No amount larger than this (in satoshi) is valid.
  *
@@ -22,7 +23,8 @@ static const CAmount COIN = 100000000;
  * critical; in unusual circumstances like a(nother) overflow bug that allowed
  * for the creation of coins out of thin air modification could lead to a fork.
  * */
-static const CAmount MAX_MONEY = 21000000 * COIN;
+static const CAmount MAX_MONEY_BTC = 21000000 * COIN_BTC;
+static const CAmount MAX_MONEY = 6000000000 * COIN;
 inline bool MoneyRange(const CAmount& nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 
 #endif //  BITCOIN_AMOUNT_H

@@ -68,12 +68,50 @@ public:
     }
 };
 
+class CPacketCryptProofEntity
+{
+public:
+    unsigned int type;
+    std::vector<unsigned char> content;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(VARINT(type));
+        READWRITE(content);
+    }
+};
+class CPacketCryptProof
+{
+    std::vector<CPacketCryptProofEntity> entities;
+public:
+    CPacketCryptProof()
+    {
+    }
+    template<typename Stream>
+    void Serialize(Stream& s) const {
+        for (auto it = entities.begin(); it != entities.end(); ++it) {
+            s << *it;
+        }
+    }
+    template<typename Stream>
+    void Unserialize(Stream& s) {
+        for (;;) {
+            CPacketCryptProofEntity e;
+            s >> e;
+            entities.push_back(e);
+            if (e.type == 0) { return; }
+        }
+    }
+};
 
 class CBlock : public CBlockHeader
 {
 public:
     // network and disk
     std::vector<CTransactionRef> vtx;
+    CPacketCryptProof pcp;
 
     // memory only
     mutable bool fChecked;
@@ -94,6 +132,7 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITEAS(CBlockHeader, *this);
+        READWRITE(pcp);
         READWRITE(vtx);
     }
 

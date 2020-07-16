@@ -1063,6 +1063,13 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                 }
                 break;
 
+                case OP_VERNOTIF: {
+                    // Vote for, vote against
+                    popstack(stack);
+                    popstack(stack);
+                }
+                break;
+
                 default:
                     return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
             }
