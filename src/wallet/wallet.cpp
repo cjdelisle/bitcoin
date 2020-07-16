@@ -780,7 +780,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFlushOnClose)
     }
 
     //// debug print
-    WalletLogPrintf("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""), (fUpdated ? "update" : ""));
+    //WalletLogPrintf("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""), (fUpdated ? "update" : ""));
 
     // Write to disk
     if (fInsertedNew || fUpdated)
@@ -2098,6 +2098,20 @@ void CWallet::AvailableCoins(interfaces::Chain::Lock& locked_chain, std::vector<
                 }
             }
 
+            if (wtx.tx->vout[i].scriptPubKey.IsPushOnly()) {
+                // We're going to assume it's some kind of a segwit because it's a push only script
+                // so we'll accept to spend 1200 of them at a time
+                //printf("%s looks like a segwit\n", wtx.tx->vout[i].ToString().c_str());
+                if (vCoins.size() >= 1198) {
+                    return;
+                }
+            } else {
+                //printf("%s looks like a non-segwit\n", wtx.tx->vout[i].ToString().c_str());
+                if (vCoins.size() >= 498) {
+                    return;
+                }
+            }
+
             // Checks the maximum number of UTXO's.
             if (nMaximumCount > 0 && vCoins.size() >= nMaximumCount) {
                 return;
@@ -2475,6 +2489,7 @@ OutputType CWallet::TransactionChangeType(OutputType change_type, const std::vec
 bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std::vector<CRecipient>& vecSend, CTransactionRef& tx, CAmount& nFeeRet,
                          int& nChangePosInOut, std::string& strFailReason, const CCoinControl& coin_control, bool sign)
 {
+    bool sweep = false;
     CAmount nValue = 0;
     ReserveDestination reservedest(this);
     int nChangePosRequest = nChangePosInOut;
@@ -2485,6 +2500,10 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
         {
             strFailReason = _("Transaction amounts must not be negative").translated;
             return false;
+        } else if (nValue == 0) {
+            sweep = true;
+            if (!recipient.fSubtractFeeFromAmount)
+                nSubtractFeeFromAmount++;
         }
         nValue += recipient.nAmount;
 
@@ -2494,6 +2513,10 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
     if (vecSend.empty())
     {
         strFailReason = _("Transaction must have at least one recipient").translated;
+        return false;
+    }
+    if (sweep && vecSend.size() > 1) {
+        strFailReason = "Can only sweep to one address";
         return false;
     }
 
@@ -2576,9 +2599,17 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
                 coin_selection_params.tx_noinputs_size = 11; // Static vsize overhead + outputs vsize. 4 nVersion, 4 nLocktime, 1 input count, 1 output count, 1 witness overhead (dummy, flag, stack size)
                 for (const auto& recipient : vecSend)
                 {
-                    CTxOut txout(recipient.nAmount, recipient.scriptPubKey);
+                    CAmount amt = recipient.nAmount;
+                    if (sweep) {
+                        amt = 0;
+                        for (auto c : vAvailableCoins) {
+                            auto cc = c.GetInputCoin();
+                            amt += cc.effective_value;
+                        }
+                    }
+                    CTxOut txout(amt, recipient.scriptPubKey);
 
-                    if (recipient.fSubtractFeeFromAmount)
+                    if (recipient.fSubtractFeeFromAmount || sweep)
                     {
                         assert(nSubtractFeeFromAmount != 0);
                         txout.nValue -= nFeeRet / nSubtractFeeFromAmount; // Subtract fee equally from each selected recipient
@@ -2610,7 +2641,17 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
 
                 // Choose coins to use
                 bool bnb_used;
-                if (pick_new_inputs) {
+                if (sweep) {
+                    for (const COutput& out : vAvailableCoins)
+                    {
+                        if (!out.fSpendable)
+                            continue;
+                        nValueIn += out.tx->tx->vout[out.i].nValue;
+                        setCoins.insert(out.GetInputCoin());
+                    }
+                    bnb_used = false;
+                    nValueToSelect = nValueIn;
+                } else if (pick_new_inputs) {
                     nValueIn = 0;
                     setCoins.clear();
                     int change_spend_size = CalculateMaximumSignedInputSize(change_prototype_txout, this);
@@ -2641,6 +2682,8 @@ bool CWallet::CreateTransaction(interfaces::Chain::Lock& locked_chain, const std
                 const CAmount nChange = nValueIn - nValueToSelect;
                 if (nChange > 0)
                 {
+                    assert(!sweep);
+
                     // Fill a vout to ourself
                     CTxOut newTxOut(nChange, scriptChange);
 

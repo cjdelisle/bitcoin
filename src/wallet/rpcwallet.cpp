@@ -318,7 +318,7 @@ static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet 
     CAmount curBalance = pwallet->GetBalance(0, coin_control.m_avoid_address_reuse).m_mine_trusted;
 
     // Check amount
-    if (nValue <= 0)
+    if (nValue < 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
 
     if (nValue > curBalance)
@@ -400,7 +400,7 @@ static UniValue sendtoaddress(const JSONRPCRequest& request)
 
     // Amount
     CAmount nAmount = AmountFromValue(request.params[1]);
-    if (nAmount <= 0)
+    if (nAmount < 0)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
 
     // Wallet comments
